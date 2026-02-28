@@ -41,6 +41,8 @@ export interface PrinterSettings {
   autoSync: boolean;
   includePhone: boolean;
   includeAddress: boolean;
+  includeFooter: boolean;
+  includePaymentMethod: boolean;
 }
 
 export interface BluetoothState {

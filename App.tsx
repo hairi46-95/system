@@ -21,7 +21,9 @@ const DEFAULT_PRINTER_SETTINGS: PrinterSettings = {
   autoSaveInterval: 60,
   autoSync: false,
   includePhone: true,
-  includeAddress: true
+  includeAddress: true,
+  includeFooter: true,
+  includePaymentMethod: true
 };
 
 const HMLogo: React.FC<{ className?: string }> = ({ className }) => (
@@ -74,6 +76,8 @@ const App: React.FC = () => {
   });
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewType, setPreviewType] = useState<'a5' | 'thermal'>('a5');
   const [isPrintConfirmOpen, setIsPrintConfirmOpen] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [clientForm, setClientForm] = useState({
@@ -358,6 +362,9 @@ const App: React.FC = () => {
       if (!isTest && printerSettings.includeAddress && clientForm.address) {
         await sendDataToPrinter(char, textToBytes(`Alamat: ${clientForm.address}`));
       }
+      if (!isTest && printerSettings.includePaymentMethod) {
+        await sendDataToPrinter(char, textToBytes(`Bayaran: ${clientForm.payment}`));
+      }
 
       await sendDataToPrinter(char, textToBytes(sep));
       if (isTest) {
@@ -376,7 +383,15 @@ const App: React.FC = () => {
       await sendDataToPrinter(char, textToBytes(`JUMLAH: RM ${isTest ? '10.00' : total.toFixed(2)}`));
       await sendDataToPrinter(char, FONT_SIZE_NORMAL);
       await sendDataToPrinter(char, ESC_BOLD_OFF);
-      await sendDataToPrinter(char, textToBytes(printerSettings.footerText || "Terima Kasih"));
+      
+      if (printerSettings.includeFooter && printerSettings.footerText) {
+        await sendDataToPrinter(char, textToBytes(printerSettings.footerText));
+      } else if (!printerSettings.includeFooter) {
+        // Do not print footer
+      } else {
+        await sendDataToPrinter(char, textToBytes("Terima Kasih"));
+      }
+      
       for (let i = 0; i < printerSettings.extraFeeds; i++) await sendDataToPrinter(char, ESC_FEED);
     } catch (e) {
       alert("Ralat cetakan Bluetooth: " + e);
@@ -655,9 +670,9 @@ const App: React.FC = () => {
                 </button>
                 
                 <button onClick={handleBluetoothPrintTrigger} className="bg-blue-600/90 p-3 rounded-xl text-[10px] font-bold hover:bg-blue-500 transition-all shadow-lg shadow-blue-900/20 uppercase active:scale-95">BT PRINT</button>
+                <button onClick={() => { setPreviewType('thermal'); setIsPreviewOpen(true); }} className="bg-sky-600/90 p-3 rounded-xl text-[10px] font-bold hover:bg-sky-500 transition-all shadow-lg shadow-sky-900/20 uppercase active:scale-95">PREVIEW THERMAL</button>
+                <button onClick={() => { setPreviewType('a5'); setIsPreviewOpen(true); }} className="bg-white text-black p-3 rounded-xl text-[10px] font-bold hover:bg-gray-200 transition-all shadow-lg shadow-white/10 uppercase active:scale-95">PREVIEW A5</button>
                 <button onClick={sendWa} className="bg-green-600/90 p-3 rounded-xl text-[10px] font-bold hover:bg-green-500 transition-all shadow-lg shadow-green-900/20 uppercase active:scale-95">WHATSAPP</button>
-                <button onClick={() => handlePrint('thermal')} className="bg-sky-600/90 p-3 rounded-xl text-[10px] font-bold hover:bg-sky-500 transition-all shadow-lg shadow-sky-900/20 uppercase active:scale-95">THERMAL PC</button>
-                <button onClick={() => handlePrint('a5')} className="bg-white text-black p-3 rounded-xl text-[10px] font-bold hover:bg-gray-200 transition-all shadow-lg shadow-white/10 uppercase active:scale-95">RESIT A5</button>
                 
                 <div className="col-span-2 md:col-span-4 mt-2">
                   {editId ? (
@@ -844,6 +859,126 @@ const App: React.FC = () => {
         </div>
       )}
 
+      {/* Preview Modal */}
+      {isPreviewOpen && (
+        <div className="fixed inset-0 z-[115] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-fade-in">
+          <div className="bg-law-card border border-law-gold/50 w-full max-w-5xl rounded-2xl overflow-hidden shadow-3xl flex flex-col max-h-[90vh] transform transition-transform animate-scale-up">
+            <div className="bg-gray-900 p-6 border-b border-law-gold/20 flex justify-between items-center shadow-md">
+              <div className="flex items-center gap-3">
+                <i className="fas fa-eye text-law-gold text-2xl"></i>
+                <h3 className="text-law-gold font-cinzel text-xl tracking-widest">PREVIEW RESIT {previewType.toUpperCase()}</h3>
+              </div>
+              <button onClick={() => setIsPreviewOpen(false)} className="text-gray-500 hover:text-white transition-colors p-2"><i className="fas fa-times text-xl"></i></button>
+            </div>
+            
+            <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
+              {/* Settings Panel */}
+              <div className="w-full md:w-1/3 bg-black/50 p-6 border-r border-gray-800 overflow-y-auto flex flex-col">
+                <h4 className="text-law-gold text-sm font-bold uppercase tracking-widest mb-6">Tetapan Paparan</h4>
+                <div className="space-y-4 flex-1">
+                  <div className="flex items-center gap-4 bg-gray-900 p-4 rounded-xl border border-gray-800 hover:border-law-gold/20 transition-all group">
+                    <input type="checkbox" id="prevPhone" className="w-5 h-5 accent-law-gold cursor-pointer" checked={printerSettings.includePhone} onChange={(e) => setPrinterSettings({ ...printerSettings, includePhone: e.target.checked })} />
+                    <label htmlFor="prevPhone" className="text-xs text-gray-400 group-hover:text-gray-200 cursor-pointer select-none font-bold uppercase tracking-tighter">Paparkan No. Tel</label>
+                  </div>
+                  <div className="flex items-center gap-4 bg-gray-900 p-4 rounded-xl border border-gray-800 hover:border-law-gold/20 transition-all group">
+                    <input type="checkbox" id="prevAddress" className="w-5 h-5 accent-law-gold cursor-pointer" checked={printerSettings.includeAddress} onChange={(e) => setPrinterSettings({ ...printerSettings, includeAddress: e.target.checked })} />
+                    <label htmlFor="prevAddress" className="text-xs text-gray-400 group-hover:text-gray-200 cursor-pointer select-none font-bold uppercase tracking-tighter">Paparkan Alamat</label>
+                  </div>
+                  <div className="flex items-center gap-4 bg-gray-900 p-4 rounded-xl border border-gray-800 hover:border-law-gold/20 transition-all group">
+                    <input type="checkbox" id="prevPayment" className="w-5 h-5 accent-law-gold cursor-pointer" checked={printerSettings.includePaymentMethod} onChange={(e) => setPrinterSettings({ ...printerSettings, includePaymentMethod: e.target.checked })} />
+                    <label htmlFor="prevPayment" className="text-xs text-gray-400 group-hover:text-gray-200 cursor-pointer select-none font-bold uppercase tracking-tighter">Kaedah Bayaran</label>
+                  </div>
+                  <div className="flex items-center gap-4 bg-gray-900 p-4 rounded-xl border border-gray-800 hover:border-law-gold/20 transition-all group">
+                    <input type="checkbox" id="prevFooter" className="w-5 h-5 accent-law-gold cursor-pointer" checked={printerSettings.includeFooter} onChange={(e) => setPrinterSettings({ ...printerSettings, includeFooter: e.target.checked })} />
+                    <label htmlFor="prevFooter" className="text-xs text-gray-400 group-hover:text-gray-200 cursor-pointer select-none font-bold uppercase tracking-tighter">Nota Kaki</label>
+                  </div>
+                  
+                  {printerSettings.includeFooter && (
+                    <div className="mt-4">
+                      <label className="text-[10px] text-law-gold uppercase font-bold tracking-widest block mb-2">Teks Nota Kaki</label>
+                      <textarea className="w-full bg-black border border-gray-800 p-3 rounded-xl text-xs text-gray-300 focus:border-law-gold outline-none" rows={3} value={printerSettings.footerText} onChange={(e) => setPrinterSettings({ ...printerSettings, footerText: e.target.value })} />
+                    </div>
+                  )}
+                </div>
+                
+                <div className="mt-8">
+                  <button onClick={() => { setIsPreviewOpen(false); handlePrint(previewType); }} className="w-full bg-law-gold text-black py-4 rounded-xl font-black text-xs uppercase tracking-widest hover:brightness-110 shadow-lg shadow-law-gold/10 transition-all active:scale-95 flex items-center justify-center gap-2">
+                    <i className="fas fa-print"></i> CETAK SEKARANG
+                  </button>
+                </div>
+              </div>
+              
+              {/* Preview Area */}
+              <div className="w-full md:w-2/3 bg-gray-200 p-8 overflow-y-auto flex justify-center items-start">
+                {previewType === 'a5' ? (
+                  <div className="bg-white text-black p-8 shadow-2xl w-full max-w-[148mm] min-h-[210mm] text-sm">
+                    <div className="flex flex-col items-center border-b-2 border-black pb-4 mb-6">
+                      <HMLogo className="w-24 h-24 mb-2" />
+                      <h1 className="text-2xl font-bold font-serif text-center">HAIRI MUSTAFA ASSOCIATES</h1>
+                      <p className="text-sm">Peguam Syarie & Pesuruhjaya Sumpah</p>
+                      <p className="text-xs text-center">Lot 02, Bangunan Arked Mara, 09100 Baling, Kedah. | Fon: 011-5653 1310</p>
+                    </div>
+                    <div className="flex justify-between mb-8 text-sm">
+                      <div>
+                        <strong>KEPADA:</strong><br />
+                        {clientForm.name || 'NAMA PELANGGAN'}<br />
+                        {printerSettings.includePhone && <>{clientForm.phone || '01X-XXXXXXX'}<br /></>}
+                        {printerSettings.includeAddress && <>{clientForm.address || 'ALAMAT PELANGGAN'}<br /></>}
+                      </div>
+                      <div className="text-right">
+                        <strong>TARIKH:</strong> {formatDateForDisplay(clientForm.date)}<br />
+                        {printerSettings.includePaymentMethod && <><strong>BAYARAN:</strong> {clientForm.payment}</>}
+                      </div>
+                    </div>
+                    <table className="w-full mb-8 text-sm">
+                      <thead className="border-b border-black"><tr><th className="text-left py-2">PERKARA</th><th className="text-right py-2">HARGA (RM)</th></tr></thead>
+                      <tbody>
+                        {cart.length > 0 ? cart.map((item, i) => (
+                          <tr key={i} className="border-b border-gray-200"><td className="py-2">{item.name}</td><td className="text-right py-2">{item.price.toFixed(2)}</td></tr>
+                        )) : (
+                          <tr className="border-b border-gray-200"><td className="py-2 italic text-gray-500">Tiada servis dipilih</td><td className="text-right py-2">0.00</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                    <div className="text-right text-xl font-bold">JUMLAH BESAR: RM {total.toFixed(2)}</div>
+                    {printerSettings.includeFooter && (
+                      <div className="mt-20 text-center text-[10px]">
+                        <p>{printerSettings.footerText}</p>
+                        <p className="mt-1 opacity-50 italic">Dijana melalui LawFirmHM Pro System</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-white text-black p-4 shadow-2xl w-[58mm] min-h-[100mm] font-mono text-[12px] leading-tight">
+                    <div className="flex justify-center mb-1"><HMLogo className="w-16 h-16" /></div>
+                    <div className="text-center font-bold">HAIRI MUSTAFA ASSOCIATES</div>
+                    <div className="text-center text-[10px]">Peguam Syarie & PJS</div>
+                    <div className="text-center text-[10px]">011-5653 1310</div>
+                    <div className="border-b border-dashed border-black my-1"></div>
+                    <div className="text-[10px]">Tarikh: {formatDateForDisplay(clientForm.date)}</div>
+                    <div className="text-[10px]">Nama: {clientForm.name || 'NAMA PELANGGAN'}</div>
+                    {printerSettings.includePhone && <div className="text-[10px]">Tel: {clientForm.phone || '01X-XXXXXXX'}</div>}
+                    {printerSettings.includeAddress && <div className="text-[10px]">Alamat: {clientForm.address || 'ALAMAT PELANGGAN'}</div>}
+                    {printerSettings.includePaymentMethod && <div className="text-[10px]">Bayaran: {clientForm.payment}</div>}
+                    <div className="border-b border-dashed border-black my-1"></div>
+                    {cart.length > 0 ? cart.map((item, i) => (
+                      <div key={i} className="flex justify-between text-[10px]"><span>{item.name}</span><span>{item.price.toFixed(2)}</span></div>
+                    )) : (
+                      <div className="flex justify-between text-[10px] italic text-gray-500"><span>Tiada servis</span><span>0.00</span></div>
+                    )}
+                    <div className="border-b border-dashed border-black my-1"></div>
+                    <div className="flex justify-between font-bold text-[12px]"><span>JUMLAH:</span><span>RM {total.toFixed(2)}</span></div>
+                    {printerSettings.includeFooter && (
+                      <div className="text-center text-[10px] mt-2 italic">{printerSettings.footerText}</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Settings Modal */}
       {isSettingsOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/95 backdrop-blur-lg animate-fade-in">
@@ -876,6 +1011,14 @@ const App: React.FC = () => {
                   <div className="flex items-center gap-4 bg-black p-4 rounded-xl border border-gray-800 hover:border-law-gold/20 transition-all group">
                     <input type="checkbox" id="includeAddress" className="w-5 h-5 accent-law-gold cursor-pointer" checked={printerSettings.includeAddress} onChange={(e) => setPrinterSettings({ ...printerSettings, includeAddress: e.target.checked })} />
                     <label htmlFor="includeAddress" className="text-xs text-gray-400 group-hover:text-gray-200 cursor-pointer select-none font-bold uppercase tracking-tighter">Paparkan Alamat</label>
+                  </div>
+                  <div className="flex items-center gap-4 bg-black p-4 rounded-xl border border-gray-800 hover:border-law-gold/20 transition-all group">
+                    <input type="checkbox" id="includePaymentMethod" className="w-5 h-5 accent-law-gold cursor-pointer" checked={printerSettings.includePaymentMethod} onChange={(e) => setPrinterSettings({ ...printerSettings, includePaymentMethod: e.target.checked })} />
+                    <label htmlFor="includePaymentMethod" className="text-xs text-gray-400 group-hover:text-gray-200 cursor-pointer select-none font-bold uppercase tracking-tighter">Kaedah Bayaran</label>
+                  </div>
+                  <div className="flex items-center gap-4 bg-black p-4 rounded-xl border border-gray-800 hover:border-law-gold/20 transition-all group">
+                    <input type="checkbox" id="includeFooter" className="w-5 h-5 accent-law-gold cursor-pointer" checked={printerSettings.includeFooter} onChange={(e) => setPrinterSettings({ ...printerSettings, includeFooter: e.target.checked })} />
+                    <label htmlFor="includeFooter" className="text-xs text-gray-400 group-hover:text-gray-200 cursor-pointer select-none font-bold uppercase tracking-tighter">Nota Kaki</label>
                   </div>
                 </div>
               </div>
@@ -943,7 +1086,10 @@ const App: React.FC = () => {
             {printerSettings.includePhone && clientForm.phone && <>{clientForm.phone}<br /></>}
             {printerSettings.includeAddress && clientForm.address && <>{clientForm.address}<br /></>}
           </div>
-          <div className="text-right"><strong>TARIKH:</strong> {formatDateForDisplay(clientForm.date)}<br /><strong>BAYARAN:</strong> {clientForm.payment}</div>
+          <div className="text-right">
+            <strong>TARIKH:</strong> {formatDateForDisplay(clientForm.date)}<br />
+            {printerSettings.includePaymentMethod && <><strong>BAYARAN:</strong> {clientForm.payment}</>}
+          </div>
         </div>
         <table className="w-full mb-8 text-sm">
           <thead className="border-b border-black"><tr><th className="text-left py-2">PERKARA</th><th className="text-right py-2">HARGA (RM)</th></tr></thead>
@@ -954,7 +1100,9 @@ const App: React.FC = () => {
           </tbody>
         </table>
         <div className="text-right text-xl font-bold">JUMLAH BESAR: RM {total.toFixed(2)}</div>
-        <div className="mt-20 text-center text-[10px]"><p>{printerSettings.footerText}</p><p className="mt-1 opacity-50 italic">Dijana melalui LawFirmHM Pro System</p></div>
+        {printerSettings.includeFooter && (
+          <div className="mt-20 text-center text-[10px]"><p>{printerSettings.footerText}</p><p className="mt-1 opacity-50 italic">Dijana melalui LawFirmHM Pro System</p></div>
+        )}
       </div>
 
       <div id="print-area-thermal" className="hidden">
@@ -967,13 +1115,16 @@ const App: React.FC = () => {
         <div className="text-[10px]">Nama: {clientForm.name}</div>
         {printerSettings.includePhone && clientForm.phone && <div className="text-[10px]">Tel: {clientForm.phone}</div>}
         {printerSettings.includeAddress && clientForm.address && <div className="text-[10px]">Alamat: {clientForm.address}</div>}
+        {printerSettings.includePaymentMethod && <div className="text-[10px]">Bayaran: {clientForm.payment}</div>}
         <div className="border-b border-dashed border-black my-1"></div>
         {cart.map((item, i) => (
           <div key={i} className="flex justify-between text-[10px]"><span>{item.name}</span><span>{item.price.toFixed(2)}</span></div>
         ))}
         <div className="border-b border-dashed border-black my-1"></div>
         <div className="flex justify-between font-bold text-[12px]"><span>JUMLAH:</span><span>RM {total.toFixed(2)}</span></div>
-        <div className="text-center text-[10px] mt-2 italic">{printerSettings.footerText}</div>
+        {printerSettings.includeFooter && (
+          <div className="text-center text-[10px] mt-2 italic">{printerSettings.footerText}</div>
+        )}
       </div>
     </div>
   );
